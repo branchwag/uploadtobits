@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Upload2Bits</title>
+  </head>
+  <body>
+    <div id="uploadsection">
+      <h1>Upload a File</h1>
+      <form
+        id="upload-form"
+        hx-post="/upload"
+        hx-target="#result"
+        hx-swap="innerHTML"
+        enctype="multipart/form-data"
+      >
+        <input type="file" name="file" />
+        <button type="submit">Upload</button>
+      </form>
+      <div id="result"></div>
+    </div>
+  </body>
+</html>
