@@ -1,13 +1,20 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+)
+
+var (
+	printableColor = color.RGBA{0, 255, 0, 255} // Green for printable characters
+	dotColor        = color.RGBA{0, 0, 0, 255}   // Black for dots (non-printable characters)
 )
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -49,37 +56,64 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("<p>File uploaded!<p>"))
 }
 
-func VisualizeBinary(filePath string) (string, error) {
+func VisualizeBinary(filePath string) (*image.RGBA, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var buf bytes.Buffer
-	for i := 0; i < len(data); i += 16 {
-		end := i + 16
-		if end > len(data) {
-			end = len(data)
-		}
+	img := image.NewRGBA(image.Rect(0, 0, 256, 256))
+	width, height := 256, 256
 
-		//print hex
-		for j := i; j < end; j++ {
-			buf.WriteString(fmt.Sprintf("%02x ", data[j]))
-		}
-
-		//print ascii
-		buf.WriteString(" | ")
-		for j := i; j < end; j++ {
-			if data[j] >= 32 && data[j] <= 126 {
-				buf.WriteString(fmt.Sprintf("%c", data[j]))
-			} else {
-				buf.WriteString(".")
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				index := y*width + x
+				if index >= len(data) {
+					break
+				}
+	
+				char := data[index]
+				var col color.Color
+	
+				if char >= 32 && char <= 126 { 
+					col = printableColor
+				} else { 
+					col = dotColor
+				}
+	
+				img.Set(x, y, col)
 			}
 		}
-		buf.WriteString("\n")
-	}
+	
+		return img, nil
 
-	return buf.String(), nil
+	//Uncomment the below for making it just hex and ascii out[ut]
+
+	// var buf bytes.Buffer
+	// for i := 0; i < len(data); i += 16 {
+	// 	end := i + 16
+	// 	if end > len(data) {
+	// 		end = len(data)
+	// 	}
+
+	// 	//print hex
+	// 	for j := i; j < end; j++ {
+	// 		buf.WriteString(fmt.Sprintf("%02x ", data[j]))
+	// 	}
+
+	// 	//print ascii
+	// 	buf.WriteString(" | ")
+	// 	for j := i; j < end; j++ {
+	// 		if data[j] >= 32 && data[j] <= 126 {
+	// 			buf.WriteString(fmt.Sprintf("%c", data[j]))
+	// 		} else {
+	// 			buf.WriteString(".")
+	// 		}
+	// 	}
+	// 	buf.WriteString("\n")
+	// }
+
+	// return buf.String(), nil
 }
 
 func vizHandler(w http.ResponseWriter, r *http.Request) {
@@ -89,14 +123,20 @@ func vizHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	output, err := VisualizeBinary(filepath)
+	img, err := VisualizeBinary(filepath) //use output instead of img for text version 
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error visualizing binary file: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "text-plain")
-	w.Write([]byte(output))
+	//uncomment below for hex and ascii output
+	// w.Header().Set("Content-Type", "text-plain")
+	// w.Write([]byte(output))
+
+	w.Header().Set("Content-Type", "image/png")
+	if err := png.Encode(w, img); err != nil {
+		http.Error(w, fmt.Sprintf("Error encoding image: %v", err), http.StatusInternalServerError)
+	}
 }
 
 func main() {
