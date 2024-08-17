@@ -1,3 +1,3 @@
 # Upload to bits
 
-Inspired by the king. A simple Go program to display uploaded files as their bit images
+Inspired by Tsoding's vod here: https://www.youtube.com/watch?v=AUWxl0WdiNI. A simple Go program to display uploaded files as their bit images. 
