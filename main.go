@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -48,9 +49,60 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("<p>File uploaded!<p>"))
 }
 
+func VisualizeBinary(filePath string) (string, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	for i := 0; i < len(data); i += 16 {
+		end := i + 16
+		if end > len(data) {
+			end = len(data)
+		}
+
+		//print hex
+		for j := i; j < end; j++ {
+			buf.WriteString(fmt.Sprintf("%02x ", data[j]))
+		}
+
+		//print ascii
+		buf.WriteString(" | ")
+		for j := i; j < end; j++ {
+			if data[j] >= 32 && data[j] <= 126 {
+				buf.WriteString(fmt.Sprintf("%c", data[j]))
+			} else {
+				buf.WriteString(".")
+			}
+		}
+		buf.WriteString("\n")
+	}
+
+	return buf.String(), nil
+}
+
+func vizHandler(w http.ResponseWriter, r *http.Request) {
+	filepath :=  "./adicon.jpg" // later use r.URL.Query().Get("file")
+	if filepath == "" {
+		http.Error(w, "Missing 'file' query parameter", http.StatusBadRequest)
+		return
+	}
+
+	output, err := VisualizeBinary(filepath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error visualizing binary file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text-plain")
+	w.Write([]byte(output))
+}
+
 func main() {
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/upload", uploadHandler)
+	http.HandleFunc("/visualize", vizHandler)
 	
 	fmt.Println("Starting server on :4242")
 

@@ -1,3 +1,3 @@
 module uploadtobits
 
-go 1.22.0
+go 1.22.6
