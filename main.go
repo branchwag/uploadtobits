@@ -84,93 +84,105 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseMultipartForm(10 << 20) // 10MB limit
-	if err != nil {
-		http.Error(w, "Unable to parse form", http.StatusBadRequest)
-		return
-	}
+    err := r.ParseMultipartForm(10 << 20) // 10MB limit
+    if err != nil {
+        http.Error(w, "Unable to parse form", http.StatusBadRequest)
+        return
+    }
 
-	file, _, err := r.FormFile("file")
-	if err != nil {
-		http.Error(w, "Unable to get file", http.StatusBadRequest)
-		return
-	}
-	defer file.Close()
+    file, _, err := r.FormFile("file")
+    if err != nil {
+        http.Error(w, "Unable to get file", http.StatusBadRequest)
+        return
+    }
+    defer file.Close()
 
-	// Define the file path to save the uploaded file
-	filePath := filepath.Join(".", "uploaded_file")
-	out, err := os.Create(filePath)
-	if err != nil {
-		http.Error(w, "Unable to create file", http.StatusInternalServerError)
-		return
-	}
-	defer out.Close()
+    fileName := "uploaded_file" // Use a unique name for each file in a real application
+    filePath := filepath.Join(".", fileName)
 
-	// Copy the file data to the new file
-	_, err = io.Copy(out, file)
-	if err != nil {
-		http.Error(w, "Unable to save file", http.StatusInternalServerError)
-		return
-	}
+    out, err := os.Create(filePath)
+    if err != nil {
+        http.Error(w, "Unable to create file", http.StatusInternalServerError)
+        return
+    }
+    defer out.Close()
 
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte("<p>File uploaded!<p>"))
+    _, err = io.Copy(out, file)
+    if err != nil {
+        http.Error(w, "Unable to save file", http.StatusInternalServerError)
+        return
+    }
+	fmt.Printf("File saved to: %s\n", filePath) // Debug statement
+
+    // Redirect to the visualization page with the file parameter
+    http.Redirect(w, r, "/visualize?file="+fileName, http.StatusSeeOther)
 }
+
+
 
 func vizHandler(w http.ResponseWriter, r *http.Request) {
-	filePath := "./adicon.jpg" 
+    fileName := r.URL.Query().Get("file")
+    if fileName == "" {
+        http.Error(w, "Missing 'file' query parameter", http.StatusBadRequest)
+        return
+    }
 
-	if filePath == "" {
-		http.Error(w, "Missing 'file' query parameter", http.StatusBadRequest)
-		return
-	}
+    filePath := filepath.Join(".", fileName)
 
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error reading file: %v", err), http.StatusInternalServerError)
-		return
-	}
+    if _, err := os.Stat(filePath); os.IsNotExist(err) {
+        http.Error(w, fmt.Sprintf("File not found: %v", err), http.StatusNotFound)
+        return
+    }
 
-	img, err := createImageFromBinary(data)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error generating image: %v", err), http.StatusInternalServerError)
-		return
-	}
+    data, err := os.ReadFile(filePath)
+    if err != nil {
+        http.Error(w, fmt.Sprintf("Error reading file: %v", err), http.StatusInternalServerError)
+        return
+    }
 
-	textOutput, err := createTextFromBinary(data)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error generating text output: %v", err), http.StatusInternalServerError)
-		return
-	}
+    img, err := createImageFromBinary(data)
+    if err != nil {
+        http.Error(w, fmt.Sprintf("Error generating image: %v", err), http.StatusInternalServerError)
+        return
+    }
 
-	// Encode image to PNG format
-	var imgBuf bytes.Buffer
-	if err := png.Encode(&imgBuf, img); err != nil {
-		http.Error(w, fmt.Sprintf("Error encoding image: %v", err), http.StatusInternalServerError)
-		return
-	}
-	imgBase64 := "data:image/png;base64," + encodeToBase64(imgBuf.Bytes())
+    textOutput, err := createTextFromBinary(data)
+    if err != nil {
+        http.Error(w, fmt.Sprintf("Error generating text output: %v", err), http.StatusInternalServerError)
+        return
+    }
 
-	// Generate HTML response
-	html := fmt.Sprintf(`
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<title>File Visualization</title>
-	</head>
-	<body>
-		<h1>File Visualization</h1>
-		<h2>Image Representation</h2>
-		<img src="%s" alt="Image Representation"/>
-		<h2>Text Representation</h2>
-		<pre>%s</pre>
-	</body>
-	</html>
-	`, imgBase64, textOutput)
+    var imgBuf bytes.Buffer
+    if err := png.Encode(&imgBuf, img); err != nil {
+        http.Error(w, fmt.Sprintf("Error encoding image: %v", err), http.StatusInternalServerError)
+        return
+    }
+    imgBase64 := "data:image/png;base64," + encodeToBase64(imgBuf.Bytes())
 
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(html))
+    html := fmt.Sprintf(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>File Visualization</title>
+    </head>
+    <body>
+        <h1>File Visualization</h1>
+        <h2>Image Representation</h2>
+        <img src="%s" alt="Image Representation"/>
+        <h2>Text Representation</h2>
+        <pre>%s</pre>
+    </body>
+    </html>
+    `, imgBase64, textOutput)
+
+	fmt.Printf("Visualizing file: %s\n", filePath) // Debug statement
+
+
+    w.Header().Set("Content-Type", "text/html")
+    w.Write([]byte(html))
 }
+
+
 
 func encodeToBase64(data []byte) string {
 	return base64.StdEncoding.EncodeToString(data)

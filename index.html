@@ -10,15 +10,13 @@
       <h1>Upload a File</h1>
       <form
         id="upload-form"
-        hx-post="/upload"
-        hx-target="#result"
-        hx-swap="innerHTML"
+        action="/upload"
+        method="post"
         enctype="multipart/form-data"
       >
         <input type="file" name="file" />
         <button type="submit">Upload</button>
       </form>
-      <div id="result"></div>
     </div>
   </body>
 </html>
